@@ -2088,4 +2088,277 @@ ${booking.note ? '\n📝 Note: ' + booking.note : ''}`);
                 
                 // Rimuovi il vecchio totale extra dal prezzo
                 if (booking.extras && booking.extras.total) {
-                    booking.prezzo -= booking.extras.
+                    booking.prezzo -= booking.extras.total;
+                }
+                
+                // Aggiorna gli extra
+                booking.extras = {
+                    pets: {
+                        enabled: petsChecked,
+                        count: petsCount,
+                        days: petsDays,
+                        price: petsPrice
+                    },
+                    earlyCheckin: {
+                        enabled: earlyCheckinChecked,
+                        price: earlyCheckinPrice
+                    },
+                    lateCheckout: {
+                        enabled: lateCheckoutChecked,
+                        price: lateCheckoutPrice
+                    },
+                    total: totalExtras
+                };
+                
+                // Aggiungi il nuovo totale extra al prezzo
+                booking.prezzo += totalExtras;
+                
+                console.log('Extra services salvati per:', booking.nome, booking.extras);
+                
+                showStatus(`✅ Servizi extra salvati per ${appData.currentExtraBookingName}!\n\n` +
+                          `🐕 Animali: ${petsChecked ? `Sì (${petsCount} x ${petsDays} giorni)` : 'No'}\n` +
+                          `⏰ Check-in anticipato: ${earlyCheckinChecked ? 'Sì' : 'No'}\n` +
+                          `⏰ Check-out posticipato: ${lateCheckoutChecked ? 'Sì' : 'No'}\n\n` +
+                          `💰 Totale extra: €${totalExtras}\n` +
+                          `💰 Nuovo totale prenotazione: €${booking.prezzo}`);
+                
+                // Aggiorna tutte le viste
+                renderManagementBookings();
+                renderCalendar();
+                updateDashboard();
+                renderBookingsList();
+            } else {
+                showStatus('❌ Errore: Prenotazione non trovata!', 'error');
+            }
+            
+            hideExtraServices();
+        }
+
+        function hideExtraServices() {
+            document.getElementById('extra-services-modal').style.display = 'none';
+        }
+
+        // Quote Functions
+        function calculateQuote() {
+            const prezzo = parseFloat(document.getElementById('prev-prezzo').value) || 0;
+            
+            if (prezzo > 0) {
+                const acconto = prezzo * 0.5;
+                const saldo = prezzo - acconto;
+                
+                document.getElementById('total-amount').textContent = prezzo.toFixed(2);
+                document.getElementById('deposit-amount').textContent = acconto.toFixed(2);
+                document.getElementById('balance-amount').textContent = saldo.toFixed(2);
+                document.getElementById('preventivo-summary').style.display = 'block';
+            } else {
+                document.getElementById('preventivo-summary').style.display = 'none';
+            }
+        }
+
+        function sendQuote() {
+            const nome = document.getElementById('prev-nome').value;
+            const email = document.getElementById('prev-email').value;
+            const villa = document.getElementById('prev-villa').value;
+            const prezzo = document.getElementById('prev-prezzo').value;
+            
+            if (!nome || !email || !villa || !prezzo) {
+                showStatus('❌ Compila tutti i campi obbligatori!', 'error');
+                return;
+            }
+            
+            const acconto = (parseFloat(prezzo) * 0.5).toFixed(2);
+            const now = new Date();
+            const codicePreventivo = `PV${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+            
+            showStatus(`📧 Preventivo ${codicePreventivo} creato per ${nome}! (Email aperta)`);
+            
+            // Reset form
+            ['prev-nome', 'prev-email', 'prev-villa', 'prev-prezzo', 'prev-checkin', 'prev-checkout', 'prev-ospiti'].forEach(id => {
+                const element = document.getElementById(id);
+                if (element) element.value = '';
+            });
+            document.getElementById('preventivo-summary').style.display = 'none';
+        }
+
+        // Email Functions
+        function sendEmail(email, tipo) {
+            const types = {
+                'conferma': '📧 Email di conferma',
+                'opzione': '📝 Email opzione',
+                'recensione': '⭐ Richiesta recensione'
+            };
+            
+            showStatus(`${types[tipo] || 'Email'} inviata a ${email}!`);
+        }
+
+        // Initialize Application
+        function initializeApp() {
+            try {
+                // Setup tab navigation
+                document.querySelectorAll('.nav-tab').forEach(tab => {
+                    tab.addEventListener('click', function() {
+                        const tabName = this.getAttribute('data-tab');
+                        if (tabName) switchTab(tabName);
+                    });
+                });
+
+                // Setup villa selection
+                document.querySelectorAll('.villa-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const villa = this.getAttribute('data-villa');
+                        if (villa) selectVilla(villa);
+                    });
+                });
+
+                // Setup month navigation
+                const prevMonthBtn = document.getElementById('prevMonth');
+                const nextMonthBtn = document.getElementById('nextMonth');
+                if (prevMonthBtn) prevMonthBtn.addEventListener('click', () => changeMonth(-1));
+                if (nextMonthBtn) nextMonthBtn.addEventListener('click', () => changeMonth(1));
+
+                // Setup form
+                const bookingForm = document.getElementById('bookingForm');
+                if (bookingForm) {
+                    console.log('Form trovato, aggiungendo event listener');
+                    bookingForm.addEventListener('submit', saveBooking);
+                } else {
+                    console.error('Form con id "bookingForm" non trovato!');
+                }
+
+                // Aggiungi anche listener diretto al pulsante submit come backup
+                const submitBtn = bookingForm?.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    console.log('Pulsante submit trovato, aggiungendo event listener');
+                    submitBtn.addEventListener('click', function(e) {
+                        console.log('Pulsante submit cliccato');
+                        if (bookingForm.checkValidity()) {
+                            e.preventDefault();
+                            saveBooking(e);
+                        }
+                    });
+                }
+
+                const newBookingBtn = document.getElementById('newBookingBtn');
+                if (newBookingBtn) {
+                    newBookingBtn.addEventListener('click', () => {
+                        resetForm();
+                        document.getElementById('nome').focus();
+                    });
+                }
+
+                const resetBtn = document.getElementById('resetBtn');
+                if (resetBtn) resetBtn.addEventListener('click', resetForm);
+
+                const floatingAdd = document.getElementById('floatingAdd');
+                if (floatingAdd) {
+                    floatingAdd.addEventListener('click', () => {
+                        switchTab('gestione');
+                        resetForm();
+                        document.getElementById('nome').focus();
+                    });
+                }
+
+                const prezzoInput = document.getElementById('prezzo');
+                if (prezzoInput) prezzoInput.addEventListener('input', calculateBookingTotal);
+
+                const searchInput = document.getElementById('searchInput');
+                if (searchInput) searchInput.addEventListener('input', searchBookings);
+
+                const statusFilter = document.getElementById('statusFilter');
+                if (statusFilter) statusFilter.addEventListener('change', filterBookings);
+
+                const prevPrezzoInput = document.getElementById('prev-prezzo');
+                if (prevPrezzoInput) prevPrezzoInput.addEventListener('input', calculateQuote);
+
+                const sendQuoteBtn = document.getElementById('sendQuoteBtn');
+                if (sendQuoteBtn) sendQuoteBtn.addEventListener('click', sendQuote);
+
+                // Modal controls - Fixed the naming conflicts
+                const closeDeleteModalBtn = document.getElementById('closeDeleteModal');
+                const cancelDeleteBtn = document.getElementById('cancelDelete');
+                const confirmDeleteBtn = document.getElementById('confirmDelete');
+                
+                if (closeDeleteModalBtn) closeDeleteModalBtn.addEventListener('click', hideDeleteModal);
+                if (cancelDeleteBtn) cancelDeleteBtn.addEventListener('click', hideDeleteModal);
+                if (confirmDeleteBtn) confirmDeleteBtn.addEventListener('click', confirmDelete);
+
+                // Extra services
+                const closeExtraServicesBtn = document.getElementById('closeExtraServices');
+                const saveExtraServicesBtn = document.getElementById('saveExtraServices');
+                const cancelExtraServicesBtn = document.getElementById('cancelExtraServices');
+                
+                if (closeExtraServicesBtn) closeExtraServicesBtn.addEventListener('click', hideExtraServices);
+                if (saveExtraServicesBtn) saveExtraServicesBtn.addEventListener('click', saveExtraServices);
+                if (cancelExtraServicesBtn) cancelExtraServicesBtn.addEventListener('click', hideExtraServices);
+
+                const petsCheckbox = document.getElementById('pets-checkbox');
+                const petsCount = document.getElementById('pets-count');
+                const petsDays = document.getElementById('pets-days');
+                const earlyCheckinCheckbox = document.getElementById('early-checkin-checkbox');
+                const lateCheckoutCheckbox = document.getElementById('late-checkout-checkbox');
+
+                if (petsCheckbox) petsCheckbox.addEventListener('change', togglePetsExtra);
+                if (petsCount) petsCount.addEventListener('change', calculateExtrasTotal);
+                if (petsDays) petsDays.addEventListener('change', calculateExtrasTotal);
+                if (earlyCheckinCheckbox) earlyCheckinCheckbox.addEventListener('change', calculateExtrasTotal);
+                if (lateCheckoutCheckbox) lateCheckoutCheckbox.addEventListener('change', calculateExtrasTotal);
+
+                // Date constraints
+                const today = new Date().toISOString().split('T')[0];
+                ['checkin', 'checkout', 'prev-checkin', 'prev-checkout'].forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) element.setAttribute('min', today);
+                });
+
+                const checkinInput = document.getElementById('checkin');
+                if (checkinInput) {
+                    checkinInput.addEventListener('change', function() {
+                        const checkinDate = new Date(this.value);
+                        checkinDate.setDate(checkinDate.getDate() + 1);
+                        const checkoutInput = document.getElementById('checkout');
+                        if (checkoutInput) {
+                            checkoutInput.setAttribute('min', checkinDate.toISOString().split('T')[0]);
+                        }
+                    });
+                }
+
+                // Modal close on outside click
+                window.addEventListener('click', function(event) {
+                    const deleteModal = document.getElementById('deleteModal');
+                    const extraModal = document.getElementById('extra-services-modal');
+                    
+                    if (event.target === deleteModal) hideDeleteModal();
+                    if (event.target === extraModal) hideExtraServices();
+                });
+
+                // Initialize views
+                updateDashboard();
+                renderCalendar();
+                renderBookingsList();
+                renderManagementBookings();
+
+                showStatus('🚀 Quirino Residence Manager caricato con successo!');
+                
+            } catch (error) {
+                showStatus(`❌ Errore durante inizializzazione: ${error.message}`, 'error');
+                console.error('Errore:', error);
+            }
+        }
+
+        // Start application
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeApp);
+        } else {
+            initializeApp();
+        }
+
+        // Global functions for onclick handlers
+        window.showBookingDetails = showBookingDetails;
+        window.editBooking = editBooking;
+        window.deleteBooking = deleteBooking;
+        window.sendEmail = sendEmail;
+        window.showExtraServices = showExtraServices;
+        window.confirmDelete = confirmDelete;
+    </script>
+</body>
+</html>
